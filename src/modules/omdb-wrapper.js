@@ -5,6 +5,9 @@
 import 'dotenv/config';
 import axios from "axios";
 
+process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
+
+
 const APIKEY = process.env.APIKEY; // Poné tu APIKEY, esta no funciona.
 
 function armarRequestUrl(queryParams) {
@@ -42,19 +45,31 @@ const OMDBSearchComplete = async (searchText) => {
         cantidadTotal : 0,
         datos : []
     };
-    const requestUrl = armarRequestUrl({ s: searchText });
+    let cantidadObtenida = 0;
+    let page = 1;
+    let requestUrl;
+    let response;
 
     try {
-        const response = await axios.get(requestUrl);
+        requestUrl = armarRequestUrl({ s: searchText });
+        response = await axios.get(requestUrl);
         returnObject.respuesta = response.data.Response === "True";
         if (returnObject.respuesta) {
             returnObject.cantidadTotal = parseInt(response.data.totalResults);
-            returnObject.datos = response.data.Search;
+            returnObject.datos.push(...response.data.Search);
+            cantidadObtenida += response.data.Search.length;
+        }
+
+        while (returnObject.respuesta && cantidadObtenida < returnObject.cantidadTotal && page < 100) {
+            page++;
+            requestUrl = armarRequestUrl({ s: searchText, page });
+            response = await axios.get(requestUrl);
+            returnObject.datos.push(...response.data.Search);
+            cantidadObtenida += response.data.Search.length;
         }
     } catch (error) {
         console.error("No se pudo conectar a la API:", error);
     }
-
     return returnObject;
 };
 const OMDBGetByImdbID = async (imdbID) => {
